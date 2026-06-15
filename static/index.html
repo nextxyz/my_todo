@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TODO</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    background: #f4f5f7;
+    color: #222;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 20px; }
+  h2 { font-size: 1.05rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  section { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  form { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 200px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+  input[type=date] { padding: 9px 10px; border: 1px solid #ccc; border-radius: 8px; font-size: .95rem; }
+  button { padding: 10px 16px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; font-size: .95rem; cursor: pointer; }
+  button:hover { background: #2563eb; }
+  ul { list-style: none; }
+  li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 4px; border-bottom: 1px solid #eee;
+  }
+  li:last-child { border-bottom: none; }
+  li input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6; }
+  li.done .content { text-decoration: line-through; color: #999; }
+  .content { flex: 1; }
+  .date-tag { font-size: .78rem; color: #888; background: #f0f0f0; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .empty { color: #aaa; font-size: .9rem; padding: 8px 4px; }
+  .menu-wrap { position: relative; }
+  .menu-btn {
+    background: none; color: #888; padding: 4px 8px; font-size: 1.1rem;
+    line-height: 1; border-radius: 6px;
+  }
+  .menu-btn:hover { background: #f0f0f0; color: #333; }
+  .menu {
+    position: absolute; right: 0; top: 100%; z-index: 10;
+    background: #fff; border: 1px solid #e2e2e2; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12); padding: 4px; min-width: 110px;
+  }
+  .menu-item {
+    display: block; width: 100%; text-align: left; background: none;
+    color: #333; padding: 8px 10px; border-radius: 6px; font-size: .9rem;
+  }
+  .menu-item:hover { background: #f5f5f5; }
+  .menu-item.danger { color: #ef4444; }
+  .menu-item.danger:hover { background: #fef2f2; }
+  .edit-input {
+    flex: 1; padding: 6px 8px; border: 1px solid #3b82f6;
+    border-radius: 6px; font-size: .95rem;
+  }
+  .edit-save, .edit-cancel {
+    padding: 6px 12px; border: none; border-radius: 6px;
+    font-size: .85rem; cursor: pointer;
+  }
+  .edit-save { background: #3b82f6; color: #fff; }
+  .edit-save:hover { background: #2563eb; }
+  .edit-cancel { background: #eee; color: #555; margin-left: 4px; }
+  .edit-cancel:hover { background: #e0e0e0; }
+  .badge { font-size: .75rem; background: #ef4444; color: #fff; border-radius: 10px; padding: 1px 8px; }
+  .lookup-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+  <h1>📝 나의 할 일</h1>
+
+  <!-- 할 일 등록 -->
+  <section>
+    <h2>할 일 추가</h2>
+    <form id="add-form">
+      <input type="text" id="add-content" placeholder="할 일을 입력하세요" required>
+      <input type="date" id="add-date" title="비워두면 오늘 날짜로 등록됩니다">
+      <button type="submit">추가</button>
+    </form>
+  </section>
+
+  <!-- 오늘 할 일 -->
+  <section>
+    <h2>오늘 할 일 <span id="today-label" class="date-tag"></span></h2>
+    <ul id="today-list"></ul>
+  </section>
+
+  <!-- 다가오는 할 일 (내일부터 7일, 오늘 미포함) -->
+  <section>
+    <h2>다가오는 할 일 <span id="upcoming-label" class="date-tag"></span></h2>
+    <ul id="upcoming-list"></ul>
+  </section>
+
+  <!-- 지난 미완료 -->
+  <section>
+    <h2>밀린 할 일 <span id="overdue-badge" class="badge" hidden></span></h2>
+    <ul id="overdue-list"></ul>
+  </section>
+
+  <!-- 날짜별 조회 -->
+  <section>
+    <h2>날짜별 조회</h2>
+    <div class="lookup-bar">
+      <input type="date" id="lookup-date">
+      <button id="lookup-btn">조회</button>
+    </div>
+    <ul id="lookup-list"></ul>
+  </section>
+
+<script>
+const API = "/todos";
+const today = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD (로컬 기준)
+
+// isoDate(YYYY-MM-DD)에 n일을 더한 날짜 문자열 반환
+function addDays(isoDate, n) {
+  const d = new Date(isoDate + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toLocaleDateString("sv-SE");
+}
+
+async function fetchTodos(params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(qs ? `${API}?${qs}` : API);
+  if (!res.ok) throw new Error("조회 실패");
+  return res.json();
+}
+
+async function addTodo(content, date) {
+  const res = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, date }),
+  });
+  if (!res.ok) throw new Error("등록 실패");
+}
+
+async function markDone(id) {
+  const res = await fetch(`${API}/${id}/done`, { method: "PATCH" });
+  if (!res.ok) throw new Error("완료 처리 실패");
+}
+
+async function markUndone(id) {
+  const res = await fetch(`${API}/${id}/undone`, { method: "PATCH" });
+  if (!res.ok) throw new Error("완료 취소 실패");
+}
+
+async function deleteTodo(id) {
+  const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("삭제 실패");
+}
+
+async function updateTodo(id, content) {
+  const res = await fetch(`${API}/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error("수정 실패");
+}
+
+function closeAllMenus() {
+  document.querySelectorAll(".menu").forEach((m) => (m.hidden = true));
+}
+
+function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습니다" } = {}) {
+  el.innerHTML = "";
+  if (items.length === 0) {
+    el.innerHTML = `<li class="empty">${emptyMsg}</li>`;
+    return;
+  }
+  for (const t of items) {
+    const li = document.createElement("li");
+    if (t.done) li.classList.add("done");
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = t.done;
+    cb.addEventListener("change", async () => {
+      // 체크 시 완료 처리, 체크 해제 시 완료 취소
+      if (cb.checked) {
+        await markDone(t.id);
+      } else {
+        await markUndone(t.id);
+      }
+      refreshAll();
+    });
+
+    const span = document.createElement("span");
+    span.className = "content";
+    span.textContent = t.content;
+
+    li.append(cb, span);
+    if (showDate) {
+      const tag = document.createElement("span");
+      tag.className = "date-tag";
+      tag.textContent = t.date;
+      li.append(tag);
+    }
+
+    // ⋯ 메뉴: 클릭 시 삭제 옵션 표시 (완료/미완료 항목 모두)
+    const menuWrap = document.createElement("div");
+    menuWrap.className = "menu-wrap";
+
+    const menuBtn = document.createElement("button");
+    menuBtn.type = "button";
+    menuBtn.className = "menu-btn";
+    menuBtn.textContent = "⋯";
+    menuBtn.setAttribute("aria-label", "더보기");
+
+    const menu = document.createElement("div");
+    menu.className = "menu";
+    menu.hidden = true;
+
+    // 할일 수정: 클릭 시 내용을 인라인 편집 모드로 전환
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "menu-item";
+    editBtn.textContent = "✏ 할일 수정";
+    editBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeAllMenus();
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "edit-input";
+      input.value = t.content;
+
+      const save = document.createElement("button");
+      save.type = "button";
+      save.className = "edit-save";
+      save.textContent = "수정";
+
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "edit-cancel";
+      cancel.textContent = "취소";
+
+      const doSave = async () => {
+        const v = input.value.trim();
+        if (!v) { input.focus(); return; } // 빈 내용은 저장 안 함
+        await updateTodo(t.id, v);
+        refreshAll();
+      };
+      save.addEventListener("click", doSave);
+      cancel.addEventListener("click", refreshAll);
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") doSave();
+        else if (ev.key === "Escape") refreshAll();
+      });
+
+      // content 텍스트 → 입력창으로, ⋯메뉴 → 수정/취소 버튼으로 교체
+      span.replaceWith(input);
+      menuWrap.replaceWith(save, cancel);
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length); // 커서를 끝으로
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "menu-item danger";
+    delBtn.textContent = "🗑 삭제";
+    delBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await deleteTodo(t.id);
+      refreshAll();
+    });
+    menu.append(editBtn, delBtn);
+
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const willOpen = menu.hidden;
+      closeAllMenus(); // 다른 항목 메뉴는 닫고
+      menu.hidden = !willOpen;
+    });
+
+    menuWrap.append(menuBtn, menu);
+    li.append(menuWrap);
+    el.append(li);
+  }
+}
+
+async function refreshToday() {
+  document.getElementById("today-label").textContent = today();
+  const items = await fetchTodos({ date: today() });
+  renderList(document.getElementById("today-list"), items, { emptyMsg: "오늘 할 일이 없습니다 🎉" });
+}
+
+async function refreshUpcoming() {
+  // 내일(오늘+1)부터 7일 뒤(오늘+7)까지, 양끝 포함. 기간 조회 엔드포인트 사용.
+  const start = addDays(today(), 1);
+  const end = addDays(today(), 7);
+  document.getElementById("upcoming-label").textContent = `${start} ~ ${end}`;
+  const items = await fetchTodos({ start, end });
+  renderList(document.getElementById("upcoming-list"), items, {
+    showDate: true,
+    emptyMsg: "다가오는 7일간 할 일이 없습니다",
+  });
+}
+
+async function refreshOverdue() {
+  // 미완료 전체를 받아서 오늘 이전 날짜만 필터
+  const items = (await fetchTodos({ done: false })).filter(t => t.date < today());
+  const badge = document.getElementById("overdue-badge");
+  badge.hidden = items.length === 0;
+  badge.textContent = items.length;
+  renderList(document.getElementById("overdue-list"), items, { showDate: true, emptyMsg: "밀린 할 일이 없습니다 👍" });
+}
+
+async function refreshLookup() {
+  const d = document.getElementById("lookup-date").value;
+  if (!d) return;
+  const items = await fetchTodos({ date: d });
+  renderList(document.getElementById("lookup-list"), items, { emptyMsg: "해당 날짜에 할 일이 없습니다" });
+}
+
+function refreshAll() {
+  refreshToday();
+  refreshUpcoming();
+  refreshOverdue();
+  refreshLookup();
+}
+
+document.getElementById("add-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const content = document.getElementById("add-content").value.trim();
+  if (!content) return;
+  const date = document.getElementById("add-date").value || today(); // 미지정 시 오늘
+  await addTodo(content, date);
+  document.getElementById("add-content").value = "";
+  document.getElementById("add-date").value = "";
+  refreshAll();
+});
+
+document.getElementById("lookup-btn").addEventListener("click", refreshLookup);
+document.getElementById("lookup-date").value = today();
+
+// 메뉴 바깥을 클릭하면 열린 메뉴 닫기
+document.addEventListener("click", closeAllMenus);
+
+refreshAll();
+</script>
+</body>
+</html>

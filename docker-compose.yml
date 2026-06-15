@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    image: todo-app
+    container_name: todo_app
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite 파일이 들어있는 /data를 이름있는 볼륨에 연결 → 컨테이너 교체에도 데이터 유지
+      - todo_data:/data
+    environment:
+      DATABASE_URL: sqlite:////data/todo.db
+    restart: unless-stopped
+
+volumes:
+  todo_data:
