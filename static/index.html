@@ -119,6 +119,11 @@ function addDays(isoDate, n) {
   return d.toLocaleDateString("sv-SE");
 }
 
+// 정렬 비교 함수
+const byContent = (a, b) => a.content.localeCompare(b.content, "ko");
+const byDateThenContent = (a, b) =>
+  a.date.localeCompare(b.date) || a.content.localeCompare(b.content, "ko");
+
 async function fetchTodos(params = {}) {
   const qs = new URLSearchParams(params).toString();
   const res = await fetch(qs ? `${API}?${qs}` : API);
@@ -283,6 +288,7 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
 async function refreshToday() {
   document.getElementById("today-label").textContent = today();
   const items = await fetchTodos({ date: today() });
+  items.sort(byContent); // 할 일 내용 오름차순
   renderList(document.getElementById("today-list"), items, { emptyMsg: "오늘 할 일이 없습니다 🎉" });
 }
 
@@ -292,6 +298,7 @@ async function refreshUpcoming() {
   const end = addDays(today(), 7);
   document.getElementById("upcoming-label").textContent = `${start} ~ ${end}`;
   const items = await fetchTodos({ start, end });
+  items.sort(byDateThenContent); // 날짜 오름차순 → 같은 날짜는 내용 오름차순
   renderList(document.getElementById("upcoming-list"), items, {
     showDate: true,
     emptyMsg: "다가오는 7일간 할 일이 없습니다",
@@ -301,6 +308,7 @@ async function refreshUpcoming() {
 async function refreshOverdue() {
   // 미완료 전체를 받아서 오늘 이전 날짜만 필터
   const items = (await fetchTodos({ done: false })).filter(t => t.date < today());
+  items.sort(byDateThenContent); // 과거 날짜 오름차순 → 같은 날짜는 내용 오름차순
   const badge = document.getElementById("overdue-badge");
   badge.hidden = items.length === 0;
   badge.textContent = items.length;
@@ -311,6 +319,7 @@ async function refreshLookup() {
   const d = document.getElementById("lookup-date").value;
   if (!d) return;
   const items = await fetchTodos({ date: d });
+  items.sort(byContent); // 할 일 내용 오름차순
   renderList(document.getElementById("lookup-list"), items, { emptyMsg: "해당 날짜에 할 일이 없습니다" });
 }
 
