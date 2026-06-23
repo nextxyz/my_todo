@@ -13,9 +13,24 @@ macOS에서는 named volume이 Docker VM 내부에 있어 호스트 파이썬으
 """
 import os
 import sqlite3
+import unicodedata
+
+
+def _w(s):
+    """문자열의 터미널 표시 폭 (한글 등 전각문자는 2칸으로 계산)."""
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in str(s))
+
+
+def _pad(s, width, align="left"):
+    """표시 폭 기준으로 패딩 (한글 섞여도 정렬 맞음)."""
+    s = str(s)
+    gap = width - _w(s)
+    if gap <= 0:
+        return s
+    return " " * gap + s if align == "right" else s + " " * gap
 
 # 기본값은 컨테이너 안의 named volume 경로. 호스트에서 쓰려면 TODO_DB로 덮어쓴다.
-DB_PATH = os.getenv("TODO_DB", "/data/todo.db")
+DB_PATH = os.getenv("TODO_DB", "./todo.db")
 
 
 def run(conn: sqlite3.Connection, title: str, sql: str, params: tuple = ()):
@@ -27,10 +42,33 @@ def run(conn: sqlite3.Connection, title: str, sql: str, params: tuple = ()):
         print("  (결과 없음)")
         return
     cols = rows[0].keys()  # sqlite3.Row 덕분에 컬럼명 접근 가능
-    print("  " + " | ".join(cols))
-    print("  " + "-" * 50)
+
+    def cell(r, c):
+        return "" if r[c] is None else r[c]
+
+    # 컬럼이 전부 숫자면 오른쪽 정렬
+    numeric = {
+        c: all(isinstance(r[c], (int, float)) or r[c] is None for r in rows) for c in cols
+    }
+    # 컬럼 폭 = 헤더와 모든 셀 중 최대 표시 폭
+    widths = {c: max(_w(c), max(_w(cell(r, c)) for r in rows)) for c in cols}
+
+    def line(left, mid, right):
+        return left + mid.join("─" * (widths[c] + 2) for c in cols) + right
+
+    def fmt(values, aligns):
+        cells = [" " + _pad(v, widths[c], a) + " " for v, c, a in zip(values, cols, aligns)]
+        return "│" + "│".join(cells) + "│"
+
+    data_align = ["right" if numeric[c] else "left" for c in cols]
+    header_align = ["left"] * len(cols)
+
+    print(line("┌", "┬", "┐"))
+    print(fmt(list(cols), header_align))
+    print(line("├", "┼", "┤"))
     for r in rows:
-        print("  " + " | ".join(str(r[c]) for c in cols))
+        print(fmt([cell(r, c) for c in cols], data_align))
+    print(line("└", "┴", "┘"))
 
 
 def main():
@@ -47,7 +85,7 @@ def main():
     conn.row_factory = sqlite3.Row
 
     # 1) 전체 조회 (= select * 와 동일)
-    run(conn, "전체 할 일", "SELECT id, date, content, done FROM todos ORDER BY id")
+    run(conn, "전체 할 일", "SELECT id, date, content, done FROM todos ORDER BY date asc")
 
     # #2) 미완료만 (done = 0)
     # run(conn, "미완료만", "SELECT id, date, content FROM todos WHERE done = 0 ORDER BY date")
