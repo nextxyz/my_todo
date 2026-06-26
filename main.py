@@ -26,11 +26,15 @@ def create_todo(body: TodoCreate, db: Session = Depends(get_db)):
 
 @app.patch("/todos/{todo_id}", response_model=TodoRead)
 def update_todo(todo_id: int, body: TodoUpdate, db: Session = Depends(get_db)):
-    """할 일 수정: 날짜는 그대로 두고 내용(content)만 변경"""
+    """할 일 수정 (부분 수정): 보낸 필드만 변경 — content, date 각각/함께 가능"""
     todo = db.get(Todo, todo_id)
     if todo is None:
         raise HTTPException(status_code=404, detail="Todo not found")
-    todo.content = body.content
+    data = body.model_dump(exclude_unset=True)  # 실제로 보낸 필드만
+    if "content" in data:
+        todo.content = data["content"]
+    if "date" in data:
+        todo.date = data["date"]
     db.commit()
     db.refresh(todo)
     return todo

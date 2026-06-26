@@ -155,11 +155,12 @@ async function deleteTodo(id) {
   if (!res.ok) throw new Error("삭제 실패");
 }
 
-async function updateTodo(id, content) {
+async function updateTodo(id, fields) {
+  // fields: { content } 또는 { date } 또는 둘 다 (부분 수정)
   const res = await fetch(`${API}/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(fields),
   });
   if (!res.ok) throw new Error("수정 실패");
 }
@@ -244,7 +245,7 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
       const doSave = async () => {
         const v = input.value.trim();
         if (!v) { input.focus(); return; } // 빈 내용은 저장 안 함
-        await updateTodo(t.id, v);
+        await updateTodo(t.id, { content: v });
         refreshAll();
       };
       save.addEventListener("click", doSave);
@@ -261,6 +262,42 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
       input.setSelectionRange(input.value.length, input.value.length); // 커서를 끝으로
     });
 
+    // 날짜 수정: 클릭 시 달력(date input)으로 전환, 날짜를 고르면 즉시 저장
+    const dateBtn = document.createElement("button");
+    dateBtn.type = "button";
+    dateBtn.className = "menu-item";
+    dateBtn.textContent = "📅 날짜 수정";
+    dateBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeAllMenus();
+
+      const input = document.createElement("input");
+      input.type = "date";
+      input.className = "edit-input";
+      input.value = t.date;
+
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "edit-cancel";
+      cancel.textContent = "취소";
+      cancel.addEventListener("click", refreshAll);
+
+      // 달력에서 날짜를 선택하면 바로 수정 적용
+      input.addEventListener("change", async () => {
+        if (!input.value) return;
+        await updateTodo(t.id, { date: input.value });
+        refreshAll();
+      });
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") refreshAll();
+      });
+
+      span.replaceWith(input);
+      menuWrap.replaceWith(cancel);
+      input.focus();
+      try { input.showPicker(); } catch (_) {} // 지원 브라우저면 달력 바로 열기
+    });
+
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "menu-item danger";
@@ -270,7 +307,7 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
       await deleteTodo(t.id);
       refreshAll();
     });
-    menu.append(editBtn, delBtn);
+    menu.append(editBtn, dateBtn, delBtn);
 
     menuBtn.addEventListener("click", (e) => {
       e.stopPropagation();
