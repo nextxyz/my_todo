@@ -2,9 +2,12 @@
 __pycache__/
 *.pyc
 *.pyo
-# 로컬 개발용 DB 파일은 이미지에 넣지 않는다 (데이터는 볼륨에서 관리)
+# 로컬 개발용 DB 파일·백업은 이미지에 넣지 않는다 (데이터는 볼륨에서 관리)
 todo.db
+todo.db.*
+*.db
 data/
+.claude/
 .git/
 .gitignore
 .dockerignore
