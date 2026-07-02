@@ -84,8 +84,16 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    # 1) 전체 조회 (= select * 와 동일)
-    run(conn, "전체 할 일", "SELECT id, date, content, done FROM todos ORDER BY date asc")
+    # 오늘 기준 과거 1개월 ~ 미래 1개월 범위만 조회 (DB가 커져도 화면이 안 넘치게)
+    # date('now','localtime')로 UTC가 아닌 로컬 오늘 날짜를 기준으로 삼는다.
+    run(
+        conn,
+        "할 일 (오늘 기준 -1개월 ~ +1개월)",
+        """SELECT id, date, content, done FROM todos
+           WHERE date BETWEEN date('now', 'localtime', '-1 month')
+                          AND date('now', 'localtime', '+1 month')
+           ORDER BY date ASC""",
+    )
 
     # #2) 미완료만 (done = 0)
     # run(conn, "미완료만", "SELECT id, date, content FROM todos WHERE done = 0 ORDER BY date")
