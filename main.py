@@ -1,7 +1,10 @@
+import base64
+import os
+import secrets
 from datetime import date as date_type
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -11,6 +14,30 @@ from models import Todo
 from schemas import TodoCreate, TodoRead, TodoUpdate
 
 app = FastAPI(title="TODO API")
+
+# HTTP Basic 인증: 두 환경변수가 모두 설정된 경우에만 활성화된다.
+# (로컬 개발은 env 없이 그대로, 외부 공개 시에만 켜서 씀. 비밀번호는 코드에 두지 않음)
+BASIC_AUTH_USER = os.getenv("BASIC_AUTH_USER")
+BASIC_AUTH_PASS = os.getenv("BASIC_AUTH_PASS")
+
+
+@app.middleware("http")
+async def basic_auth(request, call_next):
+    if BASIC_AUTH_USER and BASIC_AUTH_PASS:
+        ok = False
+        header = request.headers.get("Authorization", "")
+        if header.startswith("Basic "):
+            try:
+                user, _, pw = base64.b64decode(header[6:]).decode("utf-8").partition(":")
+                # 타이밍 공격 방지를 위해 compare_digest 사용
+                ok = secrets.compare_digest(user, BASIC_AUTH_USER) and secrets.compare_digest(
+                    pw, BASIC_AUTH_PASS
+                )
+            except Exception:
+                ok = False
+        if not ok:
+            return Response(status_code=401, headers={"WWW-Authenticate": 'Basic realm="TODO"'})
+    return await call_next(request)
 
 
 # --- 엔드포인트 ---
