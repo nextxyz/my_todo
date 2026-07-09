@@ -119,6 +119,13 @@ function addDays(isoDate, n) {
   return d.toLocaleDateString("sv-SE");
 }
 
+// isoDate → "2026-07-16(목)" 형식 (요일 부가)
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+function withWeekday(isoDate) {
+  const d = new Date(isoDate + "T00:00:00");
+  return `${isoDate}(${WEEKDAYS[d.getDay()]})`;
+}
+
 // 정렬 비교 함수
 const byContent = (a, b) => a.content.localeCompare(b.content, "ko");
 const byDateThenContent = (a, b) =>
@@ -200,7 +207,7 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
     if (showDate) {
       const tag = document.createElement("span");
       tag.className = "date-tag";
-      tag.textContent = t.date;
+      tag.textContent = withWeekday(t.date);
       li.append(tag);
     }
 
@@ -323,7 +330,7 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
 }
 
 async function refreshToday() {
-  document.getElementById("today-label").textContent = today();
+  document.getElementById("today-label").textContent = withWeekday(today());
   const items = await fetchTodos({ date: today() });
   items.sort(byContent); // 할 일 내용 오름차순
   renderList(document.getElementById("today-list"), items, { emptyMsg: "오늘 할 일이 없습니다 🎉" });
@@ -333,7 +340,7 @@ async function refreshUpcoming() {
   // 내일(오늘+1)부터 7일 뒤(오늘+7)까지, 양끝 포함. 기간 조회 엔드포인트 사용.
   const start = addDays(today(), 1);
   const end = addDays(today(), 7);
-  document.getElementById("upcoming-label").textContent = `${start} ~ ${end}`;
+  document.getElementById("upcoming-label").textContent = `${withWeekday(start)} ~ ${withWeekday(end)}`;
   const items = await fetchTodos({ start, end });
   items.sort(byDateThenContent); // 날짜 오름차순 → 같은 날짜는 내용 오름차순
   renderList(document.getElementById("upcoming-list"), items, {
