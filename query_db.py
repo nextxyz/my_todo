@@ -43,8 +43,13 @@ def run(conn: sqlite3.Connection, title: str, sql: str, params: tuple = ()):
         return
     cols = rows[0].keys()  # sqlite3.Row 덕분에 컬럼명 접근 가능
 
+    MAX_LEN = 30  # 이보다 길면 ...으로 생략
+
     def cell(r, c):
-        return "" if r[c] is None else r[c]
+        if r[c] is None:
+            return ""
+        s = str(r[c])
+        return s[:MAX_LEN] + "..." if len(s) > MAX_LEN else s
 
     # 컬럼이 전부 숫자면 오른쪽 정렬
     numeric = {
@@ -88,10 +93,9 @@ def main():
     # date('now','localtime')로 UTC가 아닌 로컬 오늘 날짜를 기준으로 삼는다.
     run(
         conn,
-        "할 일 (오늘 기준 -1개월 ~ +1개월)",
+        "할 일 (오늘 기준 -1개월 ~ )",
         """SELECT id, date, content, done FROM todos
-           WHERE date BETWEEN date('now', 'localtime', '-1 month')
-                          AND date('now', 'localtime', '+1 month')
+           WHERE date >= date('now', 'localtime', '-1 month')
            ORDER BY date ASC""",
     )
 
