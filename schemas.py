@@ -13,9 +13,11 @@ class TodoCreate(BaseModel):
 
 
 class TodoUpdate(BaseModel):
-    # 부분 수정: 보낸 필드만 변경 (content만, date만, 둘 다 모두 가능)
+    # 부분 수정: 보낸 필드만 변경 (content / date / memo 각각·함께 가능)
     content: Optional[ContentStr] = Field(None, description="수정할 할 일 내용")
     date: Optional[date_type] = Field(None, description="수정할 날짜 (YYYY-MM-DD)")
+    # memo는 빈 문자열("")로 지우기가 가능해야 하므로 공백 제약을 두지 않음
+    memo: Optional[str] = Field(None, description="할 일 메모 (빈 문자열이면 메모 삭제)")
 
     @field_validator("content", "date", mode="before")
     @classmethod
@@ -34,3 +36,4 @@ class TodoRead(BaseModel):
     date: date_type
     content: str
     done: bool
+    memo: Optional[str] = None

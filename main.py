@@ -62,6 +62,8 @@ def update_todo(todo_id: int, body: TodoUpdate, db: Session = Depends(get_db)):
         todo.content = data["content"]
     if "date" in data:
         todo.date = data["date"]
+    if "memo" in data:
+        todo.memo = data["memo"]
     db.commit()
     db.refresh(todo)
     return todo
