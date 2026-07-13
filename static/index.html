@@ -30,7 +30,8 @@
   li:last-child { border-bottom: none; }
   li input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; accent-color: #3b82f6; }
   li.done .content { text-decoration: line-through; color: #999; }
-  .content { flex: 1; }
+  .content { flex: 0 1 auto; min-width: 0; }
+  .row-spacer { flex: 1; }
   .date-tag { font-size: .78rem; color: #888; background: #f0f0f0; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
   .empty { color: #aaa; font-size: .9rem; padding: 8px 4px; }
   .menu-wrap { position: relative; }
@@ -239,14 +240,8 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
     span.textContent = t.content;
 
     li.append(cb, span);
-    if (showDate) {
-      const tag = document.createElement("span");
-      tag.className = "date-tag";
-      tag.textContent = withWeekday(t.date);
-      li.append(tag);
-    }
 
-    // 메모 아이콘: 메모 있으면 녹색, 없으면 회색. 클릭 시 메모 모달
+    // 메모 아이콘: 내용 바로 뒤에 위치. 메모 있으면 녹색, 없으면 회색
     const hasMemo = !!(t.memo && t.memo.trim());
     const memoBtn = document.createElement("button");
     memoBtn.type = "button";
@@ -260,6 +255,18 @@ function renderList(el, items, { showDate = false, emptyMsg = "할 일이 없습
       openMemo(t);
     });
     li.append(memoBtn);
+
+    // 스페이서: 날짜·메뉴를 오른쪽으로 밀어냄
+    const spacer = document.createElement("span");
+    spacer.className = "row-spacer";
+    li.append(spacer);
+
+    if (showDate) {
+      const tag = document.createElement("span");
+      tag.className = "date-tag";
+      tag.textContent = withWeekday(t.date);
+      li.append(tag);
+    }
 
     // ⋯ 메뉴: 클릭 시 삭제 옵션 표시 (완료/미완료 항목 모두)
     const menuWrap = document.createElement("div");
