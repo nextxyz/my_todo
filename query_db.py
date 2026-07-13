@@ -94,7 +94,7 @@ def main():
     run(
         conn,
         "할 일 (오늘 기준 -1개월 ~ )",
-        """SELECT id, date, content, done FROM todos
+        """SELECT id, date, content, done, memo FROM todos
            WHERE date >= date('now', 'localtime', '-1 month')
            ORDER BY date ASC""",
     )
