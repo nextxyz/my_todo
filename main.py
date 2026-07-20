@@ -109,14 +109,16 @@ def list_todos(
     start: Optional[date_type] = Query(None, description="기간 시작일(포함, YYYY-MM-DD)"),
     end: Optional[date_type] = Query(None, description="기간 종료일(포함, YYYY-MM-DD)"),
     done: Optional[bool] = Query(None, description="완료 여부 필터 (true/false)"),
+    q: Optional[str] = Query(None, description="할 일 내용 검색어 (content LIKE %q%)"),
     db: Session = Depends(get_db),
 ):
-    """전체/날짜별/기간별/완료여부 조회
+    """전체/날짜별/기간별/완료여부/검색 조회
 
     - GET /todos                                   → 전체 조회
     - GET /todos?date=2026-06-12                   → 특정 날짜
     - GET /todos?start=2026-06-16&end=2026-06-22   → 기간 조회(양끝 포함)
-    - GET /todos?date=2026-06-12&done=false        → 해당 날짜의 미완료만
+    - GET /todos?q=회의                             → 내용에 '회의' 포함
+    - GET /todos?start=2026-06-01&end=2026-06-30&q=회의 → 기간 + 검색어
     - GET /todos?done=false                        → 전체 미완료
     """
     stmt = select(Todo)
@@ -128,6 +130,8 @@ def list_todos(
         stmt = stmt.where(Todo.date <= end)
     if done is not None:
         stmt = stmt.where(Todo.done == done)
+    if q:
+        stmt = stmt.where(Todo.content.ilike(f"%{q}%"))  # 대소문자 무시 부분일치
     stmt = stmt.order_by(Todo.date, Todo.id)
     return db.execute(stmt).scalars().all()
 

@@ -65,7 +65,9 @@
   .edit-cancel { background: #eee; color: #555; margin-left: 4px; }
   .edit-cancel:hover { background: #e0e0e0; }
   .badge { font-size: .75rem; background: #ef4444; color: #fff; border-radius: 10px; padding: 1px 8px; }
-  .lookup-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+  .search-bar { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; align-items: center; }
+  .search-bar #search-q { flex: 1; min-width: 140px; }
+  .search-bar .tilde { color: #888; }
   /* 메모 아이콘: 메모 없으면 회색, 있으면 녹색 */
   .memo-btn { background: none; padding: 4px 6px; line-height: 0; border-radius: 6px; color: #bbb; }
   .memo-btn:hover { background: #f0f0f0; }
@@ -122,14 +124,17 @@
     <ul id="overdue-list"></ul>
   </section>
 
-  <!-- 날짜별 조회 -->
+  <!-- 할일 검색 -->
   <section>
-    <h2>날짜별 조회</h2>
-    <div class="lookup-bar">
-      <input type="date" id="lookup-date">
-      <button id="lookup-btn">조회</button>
+    <h2>할일 검색</h2>
+    <div class="search-bar">
+      <input type="date" id="search-from" title="시작일">
+      <span class="tilde">~</span>
+      <input type="date" id="search-to" title="종료일">
+      <input type="text" id="search-q" placeholder="검색어 (내용)">
+      <button id="search-btn">검색</button>
     </div>
-    <ul id="lookup-list"></ul>
+    <ul id="search-list"></ul>
   </section>
 
   <!-- 메모 작성 모달 -->
@@ -416,19 +421,34 @@ async function refreshOverdue() {
   renderList(document.getElementById("overdue-list"), items, { showDate: true, emptyMsg: "밀린 할 일이 없습니다 👍" });
 }
 
-async function refreshLookup() {
-  const d = document.getElementById("lookup-date").value;
-  if (!d) return;
-  const items = await fetchTodos({ date: d });
-  items.sort(byContent); // 할 일 내용 오름차순
-  renderList(document.getElementById("lookup-list"), items, { emptyMsg: "해당 날짜에 할 일이 없습니다" });
+let searchPerformed = false; // 한 번이라도 검색했으면 refreshAll 때 재실행
+
+async function doSearch() {
+  const from = document.getElementById("search-from").value;
+  const to = document.getElementById("search-to").value;
+  const q = document.getElementById("search-q").value.trim();
+
+  // 규칙: from+to → 기간 / 하나만 → 그 하루 / 둘 다 없음 → 전 기간
+  const params = {};
+  if (from && to) { params.start = from; params.end = to; }
+  else if (from) { params.start = from; params.end = from; }
+  else if (to) { params.start = to; params.end = to; }
+  if (q) params.q = q; // 검색어 없으면 기간만
+
+  const items = await fetchTodos(params);
+  items.sort(byDateThenContent); // 날짜 → 내용 순
+  renderList(document.getElementById("search-list"), items, { showDate: true, emptyMsg: "검색 결과가 없습니다" });
+}
+
+async function refreshSearch() {
+  if (searchPerformed) await doSearch(); // 검색한 적 있을 때만 갱신
 }
 
 function refreshAll() {
   refreshToday();
   refreshUpcoming();
   refreshOverdue();
-  refreshLookup();
+  refreshSearch();
 }
 
 document.getElementById("add-form").addEventListener("submit", async (e) => {
@@ -442,8 +462,14 @@ document.getElementById("add-form").addEventListener("submit", async (e) => {
   refreshAll();
 });
 
-document.getElementById("lookup-btn").addEventListener("click", refreshLookup);
-document.getElementById("lookup-date").value = today();
+document.getElementById("search-btn").addEventListener("click", () => {
+  searchPerformed = true;
+  doSearch();
+});
+// 검색어 입력창에서 Enter로도 검색
+document.getElementById("search-q").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { searchPerformed = true; doSearch(); }
+});
 
 // 메뉴 바깥을 클릭하면 열린 메뉴 닫기
 document.addEventListener("click", closeAllMenus);
