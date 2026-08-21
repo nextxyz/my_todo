@@ -10,6 +10,10 @@ macOS에서는 named volume이 Docker VM 내부에 있어 호스트 파이썬으
 
 ▶ 로컬 작업디렉토리 ./todo.db 조회:
     TODO_DB=./todo.db .venv/bin/python query_db.py
+
+▶ 특정 사용자의 할 일만 조회 (인증 도입 후 todos에는 소유자가 있다):
+    TODO_DB=./todo.db TODO_USER=me@example.com .venv/bin/python query_db.py
+  (stdin으로 실행할 때도 옵션이 아닌 환경변수를 쓰는 이유는 인자를 넘길 수 없기 때문)
 """
 import os
 import sqlite3
@@ -31,6 +35,9 @@ def _pad(s, width, align="left"):
 
 # 기본값은 컨테이너 안의 named volume 경로. 호스트에서 쓰려면 TODO_DB로 덮어쓴다.
 DB_PATH = os.getenv("TODO_DB", "./todo.db")
+
+# 설정하면 그 사용자의 할 일만 본다. 비우면 전체 사용자 + 소유자 없는 행까지 모두.
+USER_EMAIL = os.getenv("TODO_USER")
 
 
 def run(conn: sqlite3.Connection, title: str, sql: str, params: tuple = ()):
@@ -89,15 +96,46 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
-    # 오늘 기준 과거 1개월 ~ 미래 1개월 범위만 조회 (DB가 커져도 화면이 안 넘치게)
-    # date('now','localtime')로 UTC가 아닌 로컬 오늘 날짜를 기준으로 삼는다.
+    # 가입한 사용자 목록 (소유자별 할 일 개수 포함)
     run(
         conn,
-        "할 일 (오늘 기준 -1개월 ~ )",
-        """SELECT id, date, content, done, memo FROM todos
-           WHERE date >= date('now', 'localtime', '-1 month')
-           ORDER BY date ASC""",
+        "사용자",
+        """SELECT u.id, u.email, u.is_active, u.is_superuser,
+                  (SELECT COUNT(*) FROM todos t WHERE t.user_id = u.id) AS todo_cnt
+           FROM users u ORDER BY u.id""",
     )
+
+    # 소유자 없는 행 = 인증 도입 전 데이터. 앱에서는 아무에게도 보이지 않는다.
+    # (backfill_owner.py --email <이메일> 로 특정 사용자에게 귀속시킬 수 있다)
+    run(
+        conn,
+        "소유자 없는 할 일 (앱에서 조회 불가)",
+        "SELECT COUNT(*) AS orphan_cnt FROM todos WHERE user_id IS NULL",
+    )
+
+    # 오늘 기준 과거 1개월 ~ 미래 1개월 범위만 조회 (DB가 커져도 화면이 안 넘치게)
+    # date('now','localtime')로 UTC가 아닌 로컬 오늘 날짜를 기준으로 삼는다.
+    # LEFT JOIN인 이유: 소유자 없는 행도 빠뜨리지 않고 보여주기 위함.
+    if USER_EMAIL:
+        run(
+            conn,
+            f"할 일 — {USER_EMAIL} (오늘 기준 -1개월 ~ )",
+            """SELECT t.id, t.date, t.content, t.done, t.memo
+               FROM todos t JOIN users u ON u.id = t.user_id
+               WHERE u.email = ? AND t.date >= date('now', 'localtime', '-1 month')
+               ORDER BY t.date ASC""",
+            (USER_EMAIL,),
+        )
+    else:
+        run(
+            conn,
+            "할 일 — 전체 사용자 (오늘 기준 -1개월 ~ )",
+            """SELECT t.id, t.date, t.content, t.done, t.memo,
+                      COALESCE(u.email, '(소유자 없음)') AS owner
+               FROM todos t LEFT JOIN users u ON u.id = t.user_id
+               WHERE t.date >= date('now', 'localtime', '-1 month')
+               ORDER BY t.date ASC""",
+        )
 
     # #2) 미완료만 (done = 0)
     # run(conn, "미완료만", "SELECT id, date, content FROM todos WHERE done = 0 ORDER BY date")

@@ -14,3 +14,9 @@ data/
 .claude/
 .idea/
 .vscode/
+
+
+spec.md
+
+# 비밀값(JWT 서명키·초대 코드) — 커밋하지 않는다
+.env

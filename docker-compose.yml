@@ -10,6 +10,9 @@ services:
       - todo_data:/data
     environment:
       DATABASE_URL: sqlite:////data/todo.db
+      # 호스트의 환경변수를 그대로 전달 (미설정이면 빈 값 → 앱이 임시 키 생성/가입 개방)
+      JWT_SECRET: ${JWT_SECRET:-}
+      REGISTER_CODE: ${REGISTER_CODE:-}
     restart: unless-stopped
 
 volumes:

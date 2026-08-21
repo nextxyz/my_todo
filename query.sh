@@ -2,6 +2,7 @@
 # .venv의 파이썬으로 query_db.py 실행 (로컬 ./todo.db 조회)
 # 사용법: ./query.sh
 #   다른 DB를 보고 싶으면 환경변수로: TODO_DB=/경로/다른.db ./query.sh
+#   특정 사용자의 할 일만 보려면:  TODO_USER=me@example.com ./query.sh
 set -euo pipefail
 
 cd "$(dirname "$0")"
