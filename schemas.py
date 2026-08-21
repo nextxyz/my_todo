@@ -1,7 +1,8 @@
 from datetime import date as date_type
 from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from fastapi_users import schemas as fu_schemas
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
 # 앞뒤 공백 제거 후 1자 이상 — "   " 같은 공백만 있는 내용은 422로 거부
 ContentStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -37,3 +38,24 @@ class TodoRead(BaseModel):
     content: str
     done: bool
     memo: Optional[str] = None
+
+
+# --- 사용자(인증) 스키마 ---
+class UserRead(fu_schemas.BaseUser[int]):
+    """응답용 사용자 정보 (비밀번호 해시는 절대 포함되지 않음)"""
+
+
+class UserCreate(fu_schemas.BaseUserCreate):
+    """fastapi-users가 사용자 생성 시 받는 스키마 (email + password)"""
+
+
+class UserUpdate(fu_schemas.BaseUserUpdate):
+    """본인 정보 수정용 (이메일/비밀번호 변경)"""
+
+
+class RegisterRequest(BaseModel):
+    """회원가입 요청 — 초대 코드가 설정된 서버에서는 code가 필수"""
+
+    email: EmailStr = Field(..., description="로그인에 쓸 이메일")
+    password: str = Field(..., description="비밀번호 (8자 이상)")
+    code: Optional[str] = Field(None, description="초대 코드 (REGISTER_CODE 설정 시 필수)")

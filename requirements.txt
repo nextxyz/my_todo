@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 sqlalchemy>=2.0
 alembic
+# 인증 (JWT). SQLAlchemy 어댑터가 async 전용이므로 aiosqlite가 필요하다.
+fastapi-users[sqlalchemy]
+aiosqlite

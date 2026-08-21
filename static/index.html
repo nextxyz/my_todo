@@ -91,10 +91,54 @@
   .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
   .btn-secondary { background: #eee; color: #555; }
   .btn-secondary:hover { background: #e0e0e0; }
+
+  /* --- 로그인 / 회원가입 --- */
+  .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .topbar h1 { margin-bottom: 0; flex: 1; }
+  #user-box { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #666; }
+  /* display를 지정하면 hidden 속성의 기본 display:none을 덮어쓰므로 따로 꺼준다 */
+  #user-box[hidden] { display: none; }
+  #user-box button { padding: 6px 12px; font-size: .8rem; }
+  .auth-form { flex-direction: column; }
+  .auth-form input {
+    flex: 0 0 auto; width: 100%; min-width: 0;
+    padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem;
+  }
+  .auth-form button { margin-top: 4px; }
+  .auth-error { margin-top: 12px; padding: 10px 12px; background: #fee2e2; color: #b91c1c; border-radius: 8px; font-size: .88rem; }
+  .auth-switch { margin-top: 14px; font-size: .88rem; color: #666; }
+  .auth-switch a { color: #3b82f6; text-decoration: none; margin-left: 4px; }
+  .auth-switch a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
-  <h1>📝 나의 할 일</h1>
+  <header class="topbar">
+    <h1>📝 나의 할 일</h1>
+    <div id="user-box" hidden>
+      <span id="user-email"></span>
+      <button type="button" id="logout-btn" class="btn-secondary">로그아웃</button>
+    </div>
+  </header>
+
+  <!-- 로그인 / 회원가입 (토큰이 없으면 이 화면만 보인다) -->
+  <div id="auth-view" hidden>
+    <section>
+      <h2 id="auth-title">로그인</h2>
+      <form id="auth-form" class="auth-form">
+        <input type="email" id="auth-email" placeholder="이메일" autocomplete="username" required>
+        <input type="password" id="auth-password" placeholder="비밀번호" autocomplete="current-password" required>
+        <input type="text" id="auth-code" placeholder="초대 코드" autocomplete="off" hidden>
+        <button type="submit" id="auth-submit">로그인</button>
+      </form>
+      <p id="auth-error" class="auth-error" hidden></p>
+      <p class="auth-switch">
+        <span id="auth-switch-text">계정이 없으신가요?</span><a href="#" id="auth-switch-link">회원가입</a>
+      </p>
+    </section>
+  </div>
+
+  <!-- 할 일 화면 (로그인 후에만 보인다) -->
+  <div id="app-view" hidden>
 
   <!-- 할 일 등록 -->
   <section>
@@ -148,9 +192,29 @@
       </div>
     </div>
   </div>
+  </div>
 
 <script>
 const API = "/todos";
+const TOKEN_KEY = "todo_access_token";
+
+// JWT는 쿠키가 아닌 localStorage에 보관하고, 매 요청에 Bearer 헤더로 실어 보낸다.
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+
+// 인증이 필요한 API 호출 래퍼.
+// 401이면 토큰이 만료·무효라는 뜻이므로 버리고 로그인 화면으로 되돌린다.
+async function api(path, options = {}) {
+  const headers = { ...(options.headers || {}), Authorization: `Bearer ${getToken()}` };
+  const res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    clearToken();
+    showAuth("세션이 만료되었습니다. 다시 로그인해 주세요.");
+    throw new Error("인증 만료");
+  }
+  return res;
+}
 const today = () => new Date().toLocaleDateString("sv-SE"); // YYYY-MM-DD (로컬 기준)
 
 // isoDate(YYYY-MM-DD)에 n일을 더한 날짜 문자열 반환
@@ -174,13 +238,13 @@ const byDateThenContent = (a, b) =>
 
 async function fetchTodos(params = {}) {
   const qs = new URLSearchParams(params).toString();
-  const res = await fetch(qs ? `${API}?${qs}` : API);
+  const res = await api(qs ? `${API}?${qs}` : API);
   if (!res.ok) throw new Error("조회 실패");
   return res.json();
 }
 
 async function addTodo(content, date) {
-  const res = await fetch(API, {
+  const res = await api(API, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, date }),
@@ -189,23 +253,23 @@ async function addTodo(content, date) {
 }
 
 async function markDone(id) {
-  const res = await fetch(`${API}/${id}/done`, { method: "PATCH" });
+  const res = await api(`${API}/${id}/done`, { method: "PATCH" });
   if (!res.ok) throw new Error("완료 처리 실패");
 }
 
 async function markUndone(id) {
-  const res = await fetch(`${API}/${id}/undone`, { method: "PATCH" });
+  const res = await api(`${API}/${id}/undone`, { method: "PATCH" });
   if (!res.ok) throw new Error("완료 취소 실패");
 }
 
 async function deleteTodo(id) {
-  const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+  const res = await api(`${API}/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("삭제 실패");
 }
 
 async function updateTodo(id, fields) {
   // fields: { content } 또는 { date } 또는 둘 다 (부분 수정)
-  const res = await fetch(`${API}/${id}`, {
+  const res = await api(`${API}/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(fields),
@@ -508,7 +572,131 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !memoModal.hidden) closeMemo();
 });
 
-refreshAll();
+// --- 로그인 / 회원가입 ---
+const authView = document.getElementById("auth-view");
+const appView = document.getElementById("app-view");
+const userBox = document.getElementById("user-box");
+const authError = document.getElementById("auth-error");
+
+let authMode = "login";           // "login" | "register"
+let registerCodeRequired = false; // 서버가 초대 코드를 요구하는지
+
+function setAuthError(msg) {
+  authError.textContent = msg || "";
+  authError.hidden = !msg;
+}
+
+function showAuth(msg) {
+  authView.hidden = false;
+  appView.hidden = true;
+  userBox.hidden = true;
+  setAuthError(msg);
+}
+
+function showApp(email) {
+  authView.hidden = true;
+  appView.hidden = false;
+  userBox.hidden = false;
+  document.getElementById("user-email").textContent = email;
+  setAuthError("");
+  refreshAll();
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isLogin = mode === "login";
+  document.getElementById("auth-title").textContent = isLogin ? "로그인" : "회원가입";
+  document.getElementById("auth-submit").textContent = isLogin ? "로그인" : "가입하기";
+  document.getElementById("auth-switch-text").textContent =
+    isLogin ? "계정이 없으신가요?" : "이미 계정이 있으신가요?";
+  document.getElementById("auth-switch-link").textContent = isLogin ? "회원가입" : "로그인";
+  document.getElementById("auth-password").autocomplete = isLogin ? "current-password" : "new-password";
+  // 초대 코드는 회원가입에서만, 그리고 서버가 요구할 때만 노출
+  document.getElementById("auth-code").hidden = isLogin || !registerCodeRequired;
+  setAuthError("");
+}
+
+// 서버의 detail은 문자열(HTTPException) 또는 배열(pydantic 검증 오류)로 온다
+function errorDetail(body, fallback) {
+  const d = body && body.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d) && d.length) return d[0].msg || fallback;
+  return fallback;
+}
+
+async function doLogin(email, password) {
+  // fastapi-users의 로그인은 OAuth2 password flow — form 인코딩이고 필드명이 username이다
+  const res = await fetch("/auth/jwt/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: email, password }),
+  });
+  if (!res.ok) {
+    setAuthError(res.status === 400 ? "이메일 또는 비밀번호가 올바르지 않습니다" : "로그인 실패");
+    return;
+  }
+  setToken((await res.json()).access_token);
+  showApp(email);
+}
+
+async function doRegister(email, password, code) {
+  const res = await fetch("/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password, code: code || null }),
+  });
+  if (!res.ok) {
+    setAuthError(errorDetail(await res.json().catch(() => null), "회원가입 실패"));
+    return;
+  }
+  await doLogin(email, password); // 가입 성공 → 곧바로 로그인
+}
+
+document.getElementById("auth-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("auth-email").value.trim();
+  const password = document.getElementById("auth-password").value;
+  const code = document.getElementById("auth-code").value.trim();
+  if (authMode === "login") await doLogin(email, password);
+  else await doRegister(email, password, code);
+});
+
+document.getElementById("auth-switch-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  setAuthMode(authMode === "login" ? "register" : "login");
+});
+
+document.getElementById("logout-btn").addEventListener("click", () => {
+  // 서버는 세션 상태를 두지 않으므로(stateless JWT) 토큰만 버리면 로그아웃이다
+  clearToken();
+  location.reload();
+});
+
+async function init() {
+  // 초대 코드 입력란을 띄울지 서버에 물어본다 (코드 값 자체는 내려오지 않는다)
+  registerCodeRequired = await fetch("/auth/config")
+    .then((r) => r.json())
+    .then((c) => c.register_code_required)
+    .catch(() => false);
+  setAuthMode("login");
+
+  if (!getToken()) {
+    showAuth();
+    return;
+  }
+  // 저장된 토큰이 아직 유효한지 확인하면서 사용자 이메일을 가져온다
+  const res = await fetch("/users/me", {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) {
+    clearToken();
+    showAuth();
+    return;
+  }
+  showApp((await res.json()).email);
+}
+
+init();
 </script>
 </body>
 </html>
