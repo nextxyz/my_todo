@@ -49,12 +49,16 @@ openssl rand -base64 32       # 출력값을 JWT_SECRET에 붙여넣기
 `.env` 예시:
 
 ```bash
-JWT_SECRET="KfsIdTGxTJQ7Rp/S24udziAmULQbVr7xN3pKrMBudeo="
+JWT_SECRET="여기에-openssl-출력값-붙여넣기"
 REGISTER_CODE="원하는초대코드"
 ```
 
 `.env`는 `.gitignore`·`.dockerignore`에 등록되어 **커밋되지도, 이미지에 들어가지도
 않습니다.** 값을 바꾸면 `./run.sh`를 다시 실행하면 적용됩니다.
+
+> **실제 키를 문서·이슈·커밋 메시지에 붙여넣지 마세요.** 이 저장소는 공개입니다.
+> `JWT_SECRET`이 노출되면 누구나 임의 사용자의 토큰을 위조할 수 있습니다.
+> 노출되었다면 즉시 새 값으로 교체하세요(아래 [HTTPS.md](HTTPS.md) 참고).
 
 | 변수 | 필수 | 설명 |
 | --- | --- | --- |
@@ -221,6 +225,8 @@ vi .env
 - `.env`의 `JWT_SECRET`은 한 번 정하면 바꾸지 마세요. 바꾸면 발급된 토큰이 모두
   무효가 되어 다시 로그인해야 합니다(계정과 데이터는 그대로).
 - 되돌리려면: `.venv/bin/alembic downgrade -1` (또는 백업 파일로 복원)
+- **HTTPS 없이 공개하면 비밀번호와 토큰이 평문으로 오갑니다.** 적용 방법과 그때까지의
+  임시 조치는 [HTTPS.md](HTTPS.md)를 참고하세요.
 
 ## DB 직접 조회
 
