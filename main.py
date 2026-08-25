@@ -73,6 +73,21 @@ async def auth_config():
     return {"register_code_required": bool(REGISTER_CODE)}
 
 
+@app.middleware("http")
+async def revalidate_html(request, call_next):
+    """HTML은 항상 서버에 재검증하게 한다.
+
+    StaticFiles는 Cache-Control을 붙이지 않아, 브라우저가 자체 판단으로
+    index.html을 캐시한다. 그러면 배포(git pull) 후에도 기기마다 옛 화면이
+    남는다. ETag/Last-Modified는 그대로라 실제 내용이 안 바뀌었으면 304로
+    끝나므로 비용은 거의 없다.
+    """
+    response = await call_next(request)
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 # --- 내부 헬퍼 ---
 async def get_owned_todo(db: AsyncSession, todo_id: int, user: User) -> Todo:
     """본인 소유의 할 일을 가져온다.
