@@ -20,3 +20,6 @@ spec.md
 
 # 비밀값(JWT 서명키·초대 코드) — 커밋하지 않는다
 .env
+
+# 개인 작업 환경용 스크립트 (SSH 별칭 oci-free에 의존)
+scp_from_oci_todo_db.sh
