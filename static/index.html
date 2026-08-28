@@ -132,6 +132,8 @@
   /* --- 로그인 / 회원가입 --- */
   .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
   .topbar h1 { margin-bottom: 0; flex: 1; }
+  .home-link { color: inherit; text-decoration: none; }
+  .home-link:hover { opacity: .65; }
   #user-box { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: #666; }
   /* display를 지정하면 hidden 속성의 기본 display:none을 덮어쓰므로 따로 꺼준다 */
   #user-box[hidden] { display: none; }
@@ -150,7 +152,9 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>📝 나의 할 일</h1>
+    <!-- 제목을 누르면 첫 화면으로. 절대 URL 대신 "/"를 쓰는 이유는
+         로컬(localhost)에서 열었을 때 운영 서버로 튀지 않게 하기 위함. -->
+    <h1><a href="/" class="home-link" title="처음 화면으로">📝 나의 할 일</a></h1>
     <div id="user-box" hidden>
       <span id="user-email"></span>
       <button type="button" id="logout-btn" class="btn-secondary">로그아웃</button>
