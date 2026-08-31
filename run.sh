@@ -24,7 +24,7 @@ if [ -f .env ]; then
 fi
 
 PORT="${1:-8000}"
-HOST="${2:-0.0.0.0}"
+HOST="${2:-127.0.0.1}"
 
 echo "▶ 마이그레이션 적용..."
 .venv/bin/alembic upgrade head
